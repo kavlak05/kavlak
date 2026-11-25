@@ -1,0 +1,11 @@
+{
+  "cycle_history": [
+    {
+      "cycle": 1,
+      "action": "monitor_holo_core",
+      "output": "Holo Core durumu normal; kayıtlı bellek adımı: 5.",
+      "gemini_note": "Gemini HTTP 400 (gemini-3.5-flash-lite): API key not valid. Please pass a valid API key."
+    }
+  ],
+  "agent": {}
+}

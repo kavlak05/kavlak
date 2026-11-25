@@ -1,0 +1,57 @@
+from safe_evaluator import safe_evaluate, logger
+
+
+class NexusAgent:
+    def __init__(self):
+        self.memory = []
+        self.tools = {
+            "hesapla": self._safe_calc_tool,
+            "durum": self._memory_status_tool,
+        }
+
+    def _safe_calc_tool(self, expression: str) -> str:
+        try:
+            value = safe_evaluate(expression)
+            return f"İşlem sonucu: {value}"
+        except ZeroDivisionError:
+            return "Hesaplama yapılamadı: sıfıra bölme hatası."
+        except Exception as exc:
+            logger.error("Araç çalıştırma hatası ('%s'): %s", expression, exc)
+            return "Hesaplama yapılamadı: geçersiz veya güvensiz ifade."
+
+    def _memory_status_tool(self, _arg: str = "") -> str:
+        total = len(self.memory)
+        if total == 0:
+            return "Bellek boş; henüz kayıtlı adım yok."
+        last_item = self.memory[-1]
+        return f"Toplam {total} bellek adımı var; son kayıt ({last_item['role']}): {last_item['content']}"
+
+    def perceive(self, input_data: str) -> None:
+        logger.info("[Algılandı]: %s", input_data)
+        self.memory.append({"role": "user", "content": input_data})
+
+    def plan(self):
+        if not self.memory:
+            return "respond", "Merhaba, nasıl yardımcı olabilirim?"
+        last_input = self.memory[-1]["content"].strip()
+        lowered = last_input.lower()
+        if lowered == "monitor_holo_core":
+            return "respond", f"Holo Core durumu normal; kayıtlı bellek adımı: {len(self.memory)}."
+        if lowered.startswith("durum"):
+            return "tool_durum", ""
+        if lowered.startswith("hesapla"):
+            expr = last_input[len("hesapla"):].strip()
+            return "tool_hesapla", expr
+        return "respond", "Merhaba, nasıl yardımcı olabilirim?"
+
+    def act(self) -> str:
+        action_type, data = self.plan()
+        if action_type == "tool_hesapla":
+            response = self.tools["hesapla"](data)
+        elif action_type == "tool_durum":
+            response = self.tools["durum"](data)
+        else:
+            response = data
+        logger.info("[Eylem]: %s", response)
+        self.memory.append({"role": "assistant", "content": response})
+        return response

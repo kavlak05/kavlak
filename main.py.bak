@@ -1,0 +1,55 @@
+from __future__ import annotations
+import asyncio
+import logging
+import os
+from gemini_client import GeminiClient
+from web_avatar_server import WebAvatarServer
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("nexus")
+
+
+class MetaHumanSystem:
+    def __init__(self):
+        self.gemini = GeminiClient()
+        self.cycle_count = 0
+        self.last_action = "idle"
+        self.web_server = WebAvatarServer(
+            state_provider=self.get_state,
+            chat_handler=self.handle_chat,
+            cycle_handler=self.run_cycle,
+            http_host="127.0.0.1",
+            http_port=8080,
+        )
+
+    def get_state(self) -> dict:
+        return {"cycle_count": self.cycle_count, "last_action": self.last_action, "model": self.gemini.model}
+
+    async def handle_chat(self, message: str) -> dict:
+        reply = await self.gemini.generate(
+            prompt=message,
+            system_instruction="Sen NEXUS CORE adlı otonom yapay zeka asistanısın. Kısa, doğal, net ve Türkçe yanıt ver.",
+        )
+        return {"reply_text": reply, "emotion": "focused"}
+
+    async def run_cycle(self) -> dict:
+        self.cycle_count += 1
+        self.last_action = "monitor_holo_core"
+        log.info("Otonom döngü #%s tamamlandı -> aksiyon=%s, model=%s", self.cycle_count, self.last_action, self.gemini.model)
+        return {"cycle": self.cycle_count, "action": self.last_action}
+
+    async def main_loop(self):
+        await self.web_server.start()
+        log.info("Web Hologram Avatar arayüzü aktif: http://localhost:8080 (model=%s)", self.gemini.model)
+        interval = int(os.getenv("AUTONOMY_INTERVAL_SEC", "900"))
+        try:
+            while True:
+                await asyncio.sleep(interval)
+                await self.run_cycle()
+        finally:
+            await self.web_server.stop()
+
+
+if __name__ == "__main__":
+    system = MetaHumanSystem()
+    asyncio.run(system.main_loop())

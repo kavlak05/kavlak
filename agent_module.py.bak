@@ -1,0 +1,42 @@
+from safe_evaluator import safe_evaluate, logger
+
+
+class NexusAgent:
+    def __init__(self):
+        self.memory = []
+        self.tools = {
+            "hesapla": self._safe_calc_tool,
+        }
+
+    def _safe_calc_tool(self, expression: str) -> str:
+        try:
+            value = safe_evaluate(expression)
+            return f"İşlem sonucu: {value}"
+        except ZeroDivisionError:
+            return "Hesaplama yapılamadı: sıfıra bölme hatası."
+        except Exception as exc:
+            logger.error("Araç çalıştırma hatası ('%s'): %s", expression, exc)
+            return "Hesaplama yapılamadı: geçersiz veya güvensiz ifade."
+
+    def perceive(self, input_data: str) -> None:
+        logger.info("[Algılandı]: %s", input_data)
+        self.memory.append({"role": "user", "content": input_data})
+
+    def plan(self):
+        if not self.memory:
+            return "respond", "Merhaba, nasıl yardımcı olabilirim?"
+        last_input = self.memory[-1]["content"].strip()
+        if "hesapla" in last_input.lower():
+            expr = last_input.lower().replace("hesapla", "", 1).strip()
+            return "tool", expr
+        return "respond", "Merhaba, nasıl yardımcı olabilirim?"
+
+    def act(self) -> str:
+        action_type, data = self.plan()
+        if action_type == "tool":
+            response = self.tools["hesapla"](data)
+        else:
+            response = data
+        logger.info("[Eylem]: %s", response)
+        self.memory.append({"role": "assistant", "content": response})
+        return response
